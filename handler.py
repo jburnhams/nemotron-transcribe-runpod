@@ -9,7 +9,7 @@ import urllib.request
 
 import runpod
 
-MODEL = os.environ.get("MODEL_ID", "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-FP8")
+MODEL = os.environ.get("MODEL_ID", "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B")
 CACHE_ROOT = "/runpod-volume/huggingface-cache/hub"
 PORT = int(os.environ.get("VLLM_PORT", "8000"))
 BASE = f"http://127.0.0.1:{PORT}"

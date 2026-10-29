@@ -7,8 +7,8 @@ RunPod serverless endpoint that transcribes audio with NVIDIA Nemotron 3.5 Trans
 1. Push to `main`; GitHub Actions builds `ghcr.io/jburnhams/nemotron-transcribe-runpod:latest`.
    Make the package public (or add registry credentials in RunPod).
 2. RunPod > Serverless > New Endpoint > custom image above.
-   - GPU: 48 GB (L40S) for the FP8 default, or 80 GB for BF16 (set `MODEL_ID`).
-   - Set the endpoint's **Model** field to `nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-FP8` so RunPod pre-caches the weights on the host (no volume, no storage cost). The handler finds them under `/runpod-volume/huggingface-cache/hub`, and falls back to downloading from Hugging Face.
+   - GPU: 80 GB (A100/H100) for BF16. FP8/NVFP4 repos were not public yet at release (set `MODEL_ID` once they are, then 48 GB works).
+   - Set the endpoint's **Model** field to `nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B` so RunPod pre-caches the weights on the host (no volume, no storage cost). The handler finds them under `/runpod-volume/huggingface-cache/hub`, and falls back to downloading from Hugging Face.
    - Container disk 30 GB+, execution timeout 3600 s, idle timeout ~5 s, max workers 1 to start.
    - Optional env: `MODEL_ID`, `GPU_MEM_UTIL`.
 3. Cold start downloads and loads the model (several minutes the first time).
