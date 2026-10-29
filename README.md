@@ -4,7 +4,7 @@ RunPod serverless endpoint that transcribes audio with NVIDIA Nemotron 3.5 Trans
 (vLLM + NeMo Speech). **Untested**: written without GPU access, expect a first-deploy fix or two.
 
 ## Deploy
-1. Push to `main`; GitHub Actions builds `ghcr.io/jburnhams/nemotron-transcribe-runpod:latest`.
+1. Copy `docs/build.yml.example` to `.github/workflows/build.yml` (needs a token with `workflow` scope), push to `main`; GitHub Actions builds `ghcr.io/jburnhams/nemotron-transcribe-runpod:latest`.
    Make the package public (or add registry credentials in RunPod).
 2. RunPod > Serverless > New Endpoint > custom image above.
    - GPU: 48 GB (L40S) for the FP8 default, or 80 GB for BF16 (set `MODEL_ID`).
