@@ -10,6 +10,7 @@ import urllib.request
 import runpod
 
 MODEL = os.environ.get("MODEL_ID", "nvidia/NVIDIA-Nemotron-3.5-Transcribe-30B-A4B-FP8")
+CACHE_ROOT = "/runpod-volume/huggingface-cache/hub"
 PORT = int(os.environ.get("VLLM_PORT", "8000"))
 BASE = f"http://127.0.0.1:{PORT}"
 STARTUP_TIMEOUT_S = int(os.environ.get("STARTUP_TIMEOUT_S", "900"))
@@ -20,6 +21,19 @@ SPEAKER_PROMPT = (
 )
 
 _server = None
+
+
+def _model_path():
+    """Use RunPod's pre-cached copy of the model if the endpoint's Model field is set."""
+    folder = os.path.join(CACHE_ROOT, "models--" + MODEL.replace("/", "--"))
+    try:
+        with open(os.path.join(folder, "refs", "main")) as f:
+            snap = os.path.join(folder, "snapshots", f.read().strip())
+        if os.path.isdir(snap):
+            return snap
+    except OSError:
+        pass
+    return MODEL
 
 
 def _start_server():
@@ -34,7 +48,7 @@ def _start_server():
         VLLM_USE_V2_MODEL_RUNNER="0",
     )
     cmd = [
-        "vllm", "serve", MODEL,
+        "vllm", "serve", _model_path(), "--served-model-name", MODEL,
         "--port", str(PORT),
         "--max-model-len", os.environ.get("MAX_MODEL_LEN", "65536"),
         "--gpu-memory-utilization", os.environ.get("GPU_MEM_UTIL", "0.90"),
