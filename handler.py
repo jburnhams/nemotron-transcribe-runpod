@@ -21,6 +21,7 @@ SPEAKER_PROMPT = (
 )
 
 _server = None
+LOG_PATH = "/tmp/vllm.log"
 
 
 def _model_path():
@@ -34,6 +35,14 @@ def _model_path():
     except OSError:
         pass
     return MODEL
+
+
+def _log_tail(n=4000):
+    try:
+        with open(LOG_PATH) as f:
+            return f.read()[-n:]
+    except OSError:
+        return ""
 
 
 def _start_server():
@@ -57,11 +66,12 @@ def _start_server():
     ]
     if "FP8" not in MODEL and "NVFP4" not in MODEL:
         cmd += ["--dtype", "bfloat16"]
-    _server = subprocess.Popen(cmd, env=env)
+    _log = open(LOG_PATH, "w")
+    _server = subprocess.Popen(cmd, env=env, stdout=_log, stderr=subprocess.STDOUT)
     deadline = time.time() + STARTUP_TIMEOUT_S
     while time.time() < deadline:
         if _server.poll() is not None:
-            raise RuntimeError(f"vllm exited with code {_server.returncode}")
+            raise RuntimeError(f"vllm exited with code {_server.returncode}:\n{_log_tail()}")
         try:
             urllib.request.urlopen(f"{BASE}/health", timeout=2)
             return
