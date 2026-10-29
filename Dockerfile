@@ -14,6 +14,7 @@ ARG NEMO_REF=main
 RUN git clone https://github.com/NVIDIA-NeMo/Speech.git /opt/nemo \
     && cd /opt/nemo && git checkout ${NEMO_REF} \
     && uv sync --extra asr --extra vllm --locked --no-install-project \
+    && uv pip install --no-deps -e . \
     && uv pip install "av==19.0.2" "opencv-python-headless==5.0.0.93" runpod
 
 COPY handler.py /handler.py
