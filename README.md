@@ -22,3 +22,6 @@ python client.py clip.wav --speakers # speaker tags
 Request input: `audio_base64` or `audio_url`, optional `prompt`, `speakers`, `max_tokens`.
 Response: `{"text": "...", "model": "..."}`. RunPod `/run` bodies are capped at ~10 MB, so for
 long audio pass `audio_url` (e.g. a presigned link) instead.
+
+## Loop prevention
+Output length is capped from the audio duration (`TOKENS_PER_SECOND`, default 10), runs of a phrase repeated 4+ times are collapsed to two copies, and the response includes `hit_token_cap` and `loop_trimmed` flags so you can spot suspect transcripts.

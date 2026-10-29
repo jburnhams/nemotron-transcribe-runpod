@@ -81,29 +81,77 @@ def _start_server():
     raise RuntimeError("vllm did not become healthy in time")
 
 
-def _audio_data_url(inp):
+TOKENS_PER_SECOND = float(os.environ.get("TOKENS_PER_SECOND", "10"))  # ~4 words/s plus headroom
+MAX_REPEAT_NGRAM = 6
+MIN_REPEATS = 4
+
+
+def _audio_bytes(inp):
     if inp.get("audio_base64"):
-        return f"data:audio/wav;base64,{inp['audio_base64']}"
+        return base64.b64decode(inp["audio_base64"])
     if inp.get("audio_url"):
         with urllib.request.urlopen(inp["audio_url"], timeout=120) as r:
-            return "data:audio/wav;base64," + base64.b64encode(r.read()).decode()
+            return r.read()
     raise ValueError("provide audio_base64 or audio_url")
+
+
+def _duration_s(data):
+    """Audio length via ffprobe, or None if it cannot be determined."""
+    try:
+        p = subprocess.run(
+            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+             "-of", "default=nw=1:nk=1", "-i", "pipe:0"],
+            input=data, capture_output=True, timeout=60,
+        )
+        return float(p.stdout.decode().strip())
+    except Exception:
+        return None
+
+
+def _collapse_repeats(text):
+    """Cut runs where the same 1..6 word phrase repeats MIN_REPEATS or more times in a row,
+    keeping two copies. Returns (text, trimmed)."""
+    words = text.split()
+    out, i, trimmed = [], 0, False
+    while i < len(words):
+        for n in range(1, MAX_REPEAT_NGRAM + 1):
+            gram = [w.lower().strip(".,!?") for w in words[i:i + n]]
+            if len(gram) < n:
+                continue
+            reps = 1
+            while [w.lower().strip(".,!?") for w in words[i + reps * n:i + (reps + 1) * n]] == gram:
+                reps += 1
+            if reps >= MIN_REPEATS:
+                out.extend(words[i:i + 2 * n])
+                i += reps * n
+                trimmed = True
+                break
+        else:
+            out.append(words[i])
+            i += 1
+    return " ".join(out), trimmed
 
 
 def handler(job):
     inp = job["input"]
     try:
         _start_server()
+        data = _audio_bytes(inp)
         prompt = inp.get("prompt") or (SPEAKER_PROMPT if inp.get("speakers") else DEFAULT_PROMPT)
+        max_tokens = int(inp.get("max_tokens", 16384))
+        dur = _duration_s(data)
+        if dur:
+            max_tokens = min(max_tokens, int(dur * TOKENS_PER_SECOND) + 64)
         body = {
             "model": MODEL,
             "temperature": 0,
-            "max_tokens": int(inp.get("max_tokens", 16384)),
+            "max_tokens": max_tokens,
             "chat_template_kwargs": {"enable_thinking": False},
             "messages": [{
                 "role": "user",
                 "content": [
-                    {"type": "audio_url", "audio_url": {"url": _audio_data_url(inp)}},
+                    {"type": "audio_url",
+                     "audio_url": {"url": "data:audio/wav;base64," + base64.b64encode(data).decode()}},
                     {"type": "text", "text": prompt},
                 ],
             }],
@@ -115,7 +163,15 @@ def handler(job):
         )
         with urllib.request.urlopen(req, timeout=3600) as r:
             out = json.load(r)
-        return {"text": out["choices"][0]["message"]["content"], "model": MODEL}
+        choice = out["choices"][0]
+        text, trimmed = _collapse_repeats(choice["message"]["content"])
+        return {
+            "text": text,
+            "model": MODEL,
+            "duration_s": dur,
+            "hit_token_cap": choice.get("finish_reason") == "length",
+            "loop_trimmed": trimmed,
+        }
     except Exception as e:
         return {"error": str(e)}
 
