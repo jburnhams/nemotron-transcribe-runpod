@@ -4,6 +4,7 @@ import base64
 import json
 import os
 import subprocess
+import tempfile
 import time
 import urllib.request
 
@@ -96,13 +97,16 @@ def _audio_bytes(inp):
 
 
 def _duration_s(data):
-    """Audio length via ffprobe, or None if it cannot be determined."""
+    """Audio length via ffprobe on a temp file, or None if it cannot be determined."""
     try:
-        p = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-             "-of", "default=nw=1:nk=1", "-i", "pipe:0"],
-            input=data, capture_output=True, timeout=60,
-        )
+        with tempfile.NamedTemporaryFile() as f:
+            f.write(data)
+            f.flush()
+            p = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=nw=1:nk=1", f.name],
+                capture_output=True, timeout=60,
+            )
         return float(p.stdout.decode().strip())
     except Exception:
         return None
