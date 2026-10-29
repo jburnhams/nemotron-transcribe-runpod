@@ -71,7 +71,8 @@ def _start_server():
     deadline = time.time() + STARTUP_TIMEOUT_S
     while time.time() < deadline:
         if _server.poll() is not None:
-            raise RuntimeError(f"vllm exited with code {_server.returncode}:\n{_log_tail()}")
+            code, _server = _server.returncode, None
+            raise RuntimeError(f"vllm exited with code {code}:\n{_log_tail()}")
         try:
             urllib.request.urlopen(f"{BASE}/health", timeout=2)
             return
